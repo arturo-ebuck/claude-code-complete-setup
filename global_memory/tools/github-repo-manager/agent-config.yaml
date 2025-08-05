@@ -1,0 +1,99 @@
+# GitHub Repository Management Agent Configuration
+# Repository: arturo-ebuck/claude-code-wsl-setup
+
+agent:
+  name: claude-code-repo-manager
+  version: 1.0.0
+  mode: autonomous
+  
+repository:
+  owner: arturo-ebuck
+  name: claude-code-wsl-setup
+  default_branch: main
+  remote_url: https://github.com/arturo-ebuck/claude-code-wsl-setup.git
+  
+# CRITICAL: Branch protection - NEVER commit to main
+branch_protection:
+  protected_branches:
+    - main
+    - master
+  enforcement_level: strict
+  require_pull_request: true
+  
+workflow_rules:
+  # All updates MUST use feature branches
+  branch_strategy:
+    feature_pattern: "feature/{timestamp}-{description}"
+    docs_pattern: "docs/{timestamp}-{description}"
+    fix_pattern: "fix/{timestamp}-{description}"
+    config_pattern: "config/{timestamp}-{description}"
+    update_pattern: "update/{timestamp}-{description}"
+    
+  commit_conventions:
+    format: "{type}({scope}): {description}"
+    types:
+      - feat     # New feature
+      - fix      # Bug fix
+      - docs     # Documentation only
+      - style    # Formatting, no code change
+      - refactor # Code change without new feature
+      - test     # Adding tests
+      - chore    # Maintenance tasks
+      
+  pull_request:
+    auto_create: true
+    draft_by_default: false
+    require_review: true
+    auto_assign_labels: true
+    
+automation:
+  triggers:
+    - on_file_change
+    - on_enhancement_complete
+    - on_documentation_update
+    - on_configuration_change
+    
+  actions:
+    file_change:
+      - create_feature_branch
+      - commit_changes
+      - push_to_remote
+      - create_pull_request
+      
+    documentation_update:
+      - create_docs_branch
+      - update_documentation
+      - commit_changes
+      - push_to_remote
+      - create_pull_request
+      
+validation:
+  pre_commit:
+    - syntax_check
+    - lint_files
+    - verify_no_main_commit
+    
+  pre_push:
+    - branch_name_validation
+    - commit_message_validation
+    - file_integrity_check
+    
+logging:
+  level: info
+  file: /home/jb_remus/claude_global_memory/logs/repo-manager.log
+  rotation: daily
+  retention_days: 30
+  
+permissions:
+  required:
+    - repo:write
+    - pull_request:write
+    - contents:write
+    - issues:write
+    
+safeguards:
+  prevent_main_commit: true
+  require_branch_prefix: true
+  validate_commit_format: true
+  backup_before_operation: true
+  dry_run_mode: false

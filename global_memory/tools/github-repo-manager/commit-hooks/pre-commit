@@ -1,0 +1,68 @@
+#!/bin/bash
+# Pre-commit hook to enforce branch protection and standards
+# CRITICAL: Prevents commits to main branch
+
+set -euo pipefail
+
+# Get current branch
+CURRENT_BRANCH=$(git branch --show-current)
+
+# Protected branches that cannot receive direct commits
+PROTECTED_BRANCHES=("main" "master")
+
+# Check if on protected branch
+for protected in "${PROTECTED_BRANCHES[@]}"; do
+    if [[ "$CURRENT_BRANCH" == "$protected" ]]; then
+        echo "❌ ERROR: Direct commits to '$protected' branch are not allowed!"
+        echo "Please create a feature branch instead:"
+        echo "  git checkout -b feature/your-feature-name"
+        exit 1
+    fi
+done
+
+# Validate branch naming convention
+VALID_PREFIXES=("feature/" "docs/" "fix/" "config/" "update/" "work/")
+VALID=false
+
+for prefix in "${VALID_PREFIXES[@]}"; do
+    if [[ "$CURRENT_BRANCH" == "$prefix"* ]]; then
+        VALID=true
+        break
+    fi
+done
+
+if [[ "$VALID" == false ]]; then
+    echo "❌ ERROR: Branch name '$CURRENT_BRANCH' doesn't follow naming convention!"
+    echo "Valid prefixes: ${VALID_PREFIXES[*]}"
+    echo "Example: feature/add-new-functionality"
+    exit 1
+fi
+
+# Validate commit message format
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Check conventional commit format
+CONVENTIONAL_PATTERN="^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: .+"
+if ! echo "$COMMIT_MSG" | grep -qE "$CONVENTIONAL_PATTERN"; then
+    echo "❌ ERROR: Commit message doesn't follow conventional format!"
+    echo "Format: type(scope): description"
+    echo "Types: feat, fix, docs, style, refactor, test, chore"
+    echo "Example: feat(auth): add user login functionality"
+    exit 1
+fi
+
+# Check for file size limits
+MAX_FILE_SIZE=10485760  # 10MB
+for file in $(git diff --cached --name-only); do
+    if [[ -f "$file" ]]; then
+        size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo 0)
+        if [[ $size -gt $MAX_FILE_SIZE ]]; then
+            echo "❌ ERROR: File '$file' exceeds maximum size (10MB)"
+            exit 1
+        fi
+    fi
+done
+
+echo "✅ Pre-commit checks passed!"
+exit 0
